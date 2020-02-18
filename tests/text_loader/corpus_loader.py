@@ -1,7 +1,13 @@
 import os
+import ray
+import tqdm
 import json
 import torch
+import numpy as np
+import logging
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 
 class SentenceSegmenter:
@@ -47,7 +53,9 @@ class SentenceSegmenter:
 
 
 class CorpusLoader:
-    def __init__(self, tokenizer, max_seq_length: int, corpus_path: str, cache_dir: str = ".cache/processed_corpus"):
+    def __init__(
+        self, tokenizer, max_seq_length: int, corpus_path: str, cache_dir: str = "cache/cached_corpus_sectors"
+    ):
         self.tokenizer = tokenizer
         self.corpus_path = corpus_path
         self.cache_dir = cache_dir
@@ -57,6 +65,9 @@ class CorpusLoader:
         if cache_dir:
             os.makedirs(cache_dir, exist_ok=True)
 
+        if "OMP_NUM_THREADS" not in os.environ.keys():
+            os.environ["OMP_NUM_THREADS"] = str(os.cpu_count() // 2)
+
     def load_sector(self, sector_id):
         if self.cache_dir:
 
@@ -64,6 +75,7 @@ class CorpusLoader:
 
             if os.path.exists(cache_path):
                 try:
+                    print("Loadding Cache")
                     processed_docs = torch.load(cache_path)
                     return processed_docs
                 except:
@@ -77,14 +89,35 @@ class CorpusLoader:
 
         print("Processing Data. Takes about 10 mins")
 
-        for line in data:
-            example = json.loads(line)
-            token_segments = self.sent_segmenter(example["sents"])
+        # multi-processing
+        ray_objs = []
+        step_size = len(data) // int(os.environ["OMP_NUM_THREADS"])
+        for i in range(0, len(data), step_size):
+            ray_objs.append(_process.remote(self.sent_segmenter, data[i:i + step_size], i))
 
-            processed_docs.append(token_segments)
+        for i in range(len(ray_objs)):
+            processed_docs.extend(ray.get(ray_objs[i]))
 
         if self.cache_dir:
             print("Saving Into Cache")
-            torch.save(processed_docs, f"{sector_id}_cache.pkl")
+            torch.save(processed_docs, cache_path)
 
         return processed_docs
+
+
+@ray.remote
+def _process(segmenter, lines, rank):
+    all_token_segments = []
+
+    # progress bar
+    if rank == 0:
+        lines = tqdm.tqdm(lines)
+    else:
+        lines = lines
+
+    for line in lines:
+        example = json.loads(line)
+        token_segments = segmenter(example["sents"])
+        all_token_segments.append(token_segments)
+
+    return all_token_segments
