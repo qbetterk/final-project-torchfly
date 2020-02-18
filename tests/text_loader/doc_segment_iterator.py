@@ -2,7 +2,7 @@ import os
 import numpy as np
 from corpus_loader import CorpusLoader
 
-class CorpusIterator:
+class SegmentCorpusIterator:
     def __init__(self, processed_docs):
         self.processed_docs = processed_docs
         self.total_num_docs = len(processed_docs)
@@ -21,7 +21,7 @@ class CorpusIterator:
                 yield segment, i==0
 
 
-class CorpusBatchIterator:
+class SegmentCorpusBatchIterator:
     def __init__(self, tokenizer, corpus_path:str, batch_size:int, max_seq_length:int, rank:int = 0):
         """
         Args:

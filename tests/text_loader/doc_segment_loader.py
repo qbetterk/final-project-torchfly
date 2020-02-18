@@ -52,7 +52,7 @@ class SentenceSegmenter:
         return token_segments
 
 
-class CorpusLoader:
+class SegmentCorpusLoader:
     def __init__(
         self, tokenizer, max_seq_length: int, corpus_path: str, cache_dir: str = "cache/cached_corpus_sectors"
     ):
