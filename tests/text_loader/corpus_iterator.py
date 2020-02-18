@@ -50,7 +50,7 @@ class CorpusBatchIterator:
             except StopIteration:
                 # after the iterator finishes, load the next sector
                 # update self.current_sector_id
-                self.current_sector_id = (rank + 1) % self.total_num_sectors
+                self.current_sector_id = (self.current_sector_id + 1) % self.total_num_sectors
                 iterators = self.create_corpus_iterators(self.current_sector_id)
                 
     def create_corpus_iterators(self, corpus_sector_id):
