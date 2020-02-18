@@ -1,7 +1,7 @@
 import os
 import ray
-import tqdm
 import json
+import tqdm
 import torch
 import numpy as np
 import logging

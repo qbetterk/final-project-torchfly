@@ -4,7 +4,7 @@ with open("README.md", encoding='utf-8') as fh:
     long_description = fh.read()
 
 setup(
-    name="TorchFly",
+    name="TorchFly Dev",
     version="0.0.1",
     author="Qingyang Wu",
     author_email="wilwu@ucdavis.edu",
@@ -13,7 +13,6 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/qywu/TorchFly",
     packages=find_packages(),
-    install_requires=['gdown', 'regex'],
     classifiers=[
         'Programming Language :: Python :: 3',
         "License :: OSI Approved :: MIT License",
