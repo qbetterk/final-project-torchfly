@@ -7,4 +7,6 @@
 
 ## Week 2
 
-In this week, we first decide the high level structure of our framework.
+* In this week, we first decide the high level structure of our framework.
+* Still implementing the distributed file system, openwebtext
+* Also implementing the call back system.
