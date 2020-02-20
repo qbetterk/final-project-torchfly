@@ -52,7 +52,25 @@ class SentenceSegmenter:
         return token_segments
 
 
-class SegmentCorpusLoader:
+@ray.remote
+def _process(segmenter, lines, rank):
+    all_token_segments = []
+
+    # progress bar
+    if rank == 0:
+        lines = tqdm.tqdm(lines)
+    else:
+        lines = lines
+
+    for line in lines:
+        example = json.loads(line)
+        token_segments = segmenter(example["sents"])
+        all_token_segments.append(token_segments)
+
+    return all_token_segments
+
+
+class SegmentDocLoader:
     def __init__(
         self, tokenizer, max_seq_length: int, corpus_path: str, cache_dir: str = "cache/cached_corpus_sectors"
     ):
@@ -75,11 +93,12 @@ class SegmentCorpusLoader:
 
             if os.path.exists(cache_path):
                 try:
-                    print("Loadding Cache")
+                    logger.info("Loadding Cache")
                     processed_docs = torch.load(cache_path)
+                    logger.info("Finished Loading")
                     return processed_docs
                 except:
-                    print("File Corrupted. Data will be re-processed")
+                    logger.info("File Corrupted. Data will be re-processed")
 
         # processing data
         with open(os.path.join(self.corpus_path, str(sector_id) + ".jsonl"), "r") as f:
@@ -87,7 +106,7 @@ class SegmentCorpusLoader:
 
         processed_docs = []
 
-        print("Processing Data. Takes about 10 mins")
+        logger.info("Processing Data. Takes about 10 mins")
 
         # multi-processing
         ray_objs = []
@@ -99,25 +118,8 @@ class SegmentCorpusLoader:
             processed_docs.extend(ray.get(ray_objs[i]))
 
         if self.cache_dir:
-            print("Saving Into Cache")
+            logger.info("Saving Into Cache")
             torch.save(processed_docs, cache_path)
+            logger.info("Finished Saving Into Cache")
 
         return processed_docs
-
-
-@ray.remote
-def _process(segmenter, lines, rank):
-    all_token_segments = []
-
-    # progress bar
-    if rank == 0:
-        lines = tqdm.tqdm(lines)
-    else:
-        lines = lines
-
-    for line in lines:
-        example = json.loads(line)
-        token_segments = segmenter(example["sents"])
-        all_token_segments.append(token_segments)
-
-    return all_token_segments

@@ -1,8 +1,12 @@
 import os
 import numpy as np
-from corpus_loader import CorpusLoader
+import logging
 
-class SegmentCorpusIterator:
+from segment_doc_loader import SegmentDocLoader
+
+logger = logging.getLogger(__name__)
+
+class SegmentDocIterator:
     def __init__(self, processed_docs):
         self.processed_docs = processed_docs
         self.total_num_docs = len(processed_docs)
@@ -21,7 +25,7 @@ class SegmentCorpusIterator:
                 yield segment, i==0
 
 
-class SegmentCorpusBatchIterator:
+class SegmentDocBatchIterator:
     def __init__(self, tokenizer, corpus_path:str, batch_size:int, max_seq_length:int, rank:int = 0):
         """
         Args:
@@ -31,7 +35,7 @@ class SegmentCorpusBatchIterator:
         self.tokenizer = tokenizer
         self.batch_size = batch_size
         self.current_sector_id = rank
-        self.corpus_loader = CorpusLoader(tokenizer, 
+        self.corpus_loader = SegmentDocLoader(tokenizer, 
                                           max_seq_length=max_seq_length, 
                                           corpus_path=corpus_path)
         self.total_num_sectors = len(os.listdir(corpus_path))
@@ -55,5 +59,5 @@ class SegmentCorpusBatchIterator:
                 
     def create_corpus_iterators(self, corpus_sector_id):
         processed_docs = self.corpus_loader.load_sector(self.current_sector_id)
-        iterators = [iter(CorpusIterator(processed_docs)) for i in range(self.batch_size)]
+        iterators = [iter(SegmentDocIterator(processed_docs)) for i in range(self.batch_size)]
         return iterators
