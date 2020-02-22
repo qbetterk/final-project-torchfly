@@ -2,6 +2,7 @@
 *.json
 *.jsonl
 *.txt
+*.db
 # log files
 *.log
 # pickle and torch files
