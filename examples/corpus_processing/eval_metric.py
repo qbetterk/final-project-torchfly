@@ -1,10 +1,8 @@
+#!/usr/bin/env python3
+#
 import math, logging, copy, json
 from collections import Counter, OrderedDict
 from nltk.util import ngrams
-
-import ontology
-from config import global_config as cfg
-from clean_dataset import clean_slot_values
 
 import pdb
 
