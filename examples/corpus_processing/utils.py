@@ -3,6 +3,19 @@
 import os
 from typing import List
 
+import numpy as np
+import json
+import pickle
+from config import global_config as cfg
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+import logging
+import random
+import re
+import csv
+import time, datetime
+import pdb
+
 
 def merge_short_sents(sentences: List[str], min_length=20) -> List[str]:
     """ Sentences shorter than 20 will be merged together.
@@ -23,7 +36,114 @@ def merge_short_sents(sentences: List[str], min_length=20) -> List[str]:
 
     return new_sentences
 
+def clean_replace(s, r, t, forward=True, backward=False):
+    def clean_replace_single(s, r, t, forward, backward, sidx=0):
+        idx = s[sidx:].find(r)
+        if idx == -1:
+            return s, -1
+        idx += sidx
+        idx_r = idx + len(r)
+        if backward:
+            while idx > 0 and s[idx - 1]:
+                idx -= 1
+        elif idx > 0 and s[idx - 1] != ' ':
+            return s, -1
 
+        if forward:
+            while idx_r < len(s) and (s[idx_r].isalpha() or s[idx_r].isdigit()):
+                idx_r += 1
+        elif idx_r != len(s) and (s[idx_r].isalpha() or s[idx_r].isdigit()):
+            return s, -1
+        return s[:idx] + t + s[idx_r:], idx_r
+
+    sidx = 0
+    while sidx != -1:
+        s, sidx = clean_replace_single(s, r, t, forward, backward, sidx)
+    return s
+
+
+def pad_sequences(sequences, maxlen=None, dtype='int32',
+                  padding='pre', truncating='pre', value=0.):
+    if not hasattr(sequences, '__len__'):
+        raise ValueError('`sequences` must be iterable.')
+    lengths = []
+    for x in sequences:
+        if not hasattr(x, '__len__'):
+            raise ValueError('`sequences` must be a list of iterables. '
+                             'Found non-iterable: ' + str(x))
+        lengths.append(len(x))
+
+    num_samples = len(sequences)
+    seq_maxlen = np.max(lengths)
+    if maxlen is not None and cfg.truncated:
+        maxlen = min(seq_maxlen, maxlen)
+    else:
+        maxlen = seq_maxlen
+    # take the sample shape from the first non empty sequence
+    # checking for consistency in the main loop below.
+    sample_shape = tuple()
+    for s in sequences:
+        if len(s) > 0:
+            sample_shape = np.asarray(s).shape[1:]
+            break
+
+    x = (np.ones((num_samples, maxlen) + sample_shape) * value).astype(dtype)
+    for idx, s in enumerate(sequences):
+        if not len(s):
+            continue  # empty list/array was found
+        if truncating == 'pre':
+            trunc = s[-maxlen:]
+        elif truncating == 'post':
+            trunc = s[:maxlen]
+        else:
+            raise ValueError('Truncating type "%s" not understood' % truncating)
+
+        # check `trunc` has expected shape
+        trunc = np.asarray(trunc, dtype=dtype)
+        if trunc.shape[1:] != sample_shape:
+            raise ValueError('Shape of sample %s of sequence at position %s is different from expected shape %s' %
+                             (trunc.shape[1:], idx, sample_shape))
+
+        if padding == 'post':
+            x[idx, :len(trunc)] = trunc
+        elif padding == 'pre':
+            x[idx, -len(trunc):] = trunc
+        else:
+            raise ValueError('Padding type "%s" not understood' % padding)
+    return x
+
+def get_glove_matrix(vocab, initial_embedding_np):
+    """
+    return a glove embedding matrix
+    :param self:
+    :param glove_file:
+    :param initial_embedding_np:
+    :return: np array of [V,E]
+    """
+    ef = open(cfg.glove_path, 'r')
+    cnt = 0
+    vec_array = initial_embedding_np
+    old_avg = np.average(vec_array)
+    old_std = np.std(vec_array)
+    vec_array = vec_array.astype(np.float32)
+    new_avg, new_std = 0, 0
+
+    for line in ef.readlines():
+        line = line.strip().split(' ')
+        word, vec = line[0], line[1:]
+        vec = np.array(vec, np.float32)
+        word_idx = vocab.encode(word)
+        if word.lower() in ['unk', '<unk>'] or word_idx != vocab.encode('<unk>'):
+            cnt += 1
+            vec_array[word_idx] = vec
+            new_avg += np.average(vec)
+            new_std += np.std(vec)
+    new_avg /= cnt
+    new_std /= cnt
+    ef.close()
+    logging.info('%d known embedding. old mean: %f new mean %f, old std %f new std %f' % (cnt, old_avg,
+                                                                                          new_avg, old_std, new_std))
+    return vec_array
 
 def write_dict(fn, dic):
     with open(fn, 'w') as f:
